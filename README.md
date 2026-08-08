@@ -7,7 +7,7 @@
 ## 🎬 功能截图
 
 ### 游戏混音控制面板
-![游戏混音面板开启状态](./mix_on.png)
+![游戏混音面板开启状态](https://cdn.jsdelivr.net/gh/JinIilaiQiaoMen/AuroraMusic@main/mix_on.png)
 
 ---
 
