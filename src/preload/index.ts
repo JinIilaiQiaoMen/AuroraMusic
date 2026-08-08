@@ -16,7 +16,8 @@ const api = {
     removeSongsFromLibrary: (songIds: number[]) => ipcRenderer.invoke('library:removeSongsFromLibrary', songIds),
     getFavorites: () => ipcRenderer.invoke('library:getFavorites'),
     search: (kw: string, limit?: number) => ipcRenderer.invoke('library:search', kw, limit),
-    addPlayHistory: (songId: number, durationSec: number) => ipcRenderer.invoke('library:addPlayHistory', songId, durationSec)
+    addPlayHistory: (songId: number, durationSec: number) => ipcRenderer.invoke('library:addPlayHistory', songId, durationSec),
+    getLyrics: (songId: number) => ipcRenderer.invoke('library:getLyrics', songId)
   },
   settings: {
     get: <T = unknown>(k: string, def?: T) => ipcRenderer.invoke('settings:get', k, def),

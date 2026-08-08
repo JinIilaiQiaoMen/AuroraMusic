@@ -1,0 +1,77 @@
+======================================================
+  AuroraMusic v0.3.0 Release 发布指南
+  （复制粘贴即可，1 分钟搞定）
+======================================================
+
+
+【 第 1 步：打开发布页面（已自动选好 tag）】
+链接：https://github.com/JinIilaiQiaoMen/AuroraMusic/releases/new?tag=v0.3.0
+（如果没登录，请先登录 GitHub 账号）
+
+
+【 第 2 步：Release 标题（复制下面这行）】
+------------------------------------------------------
+v0.3.0 - 游戏音乐混音播放器
+------------------------------------------------------
+
+
+【 第 3 步：Describe this release（复制整个代码块）】
+------------------------------------------------------
+## 🎵 AuroraMusic v0.3.0 发布
+
+首款 Aurora 风格的 **本地音乐播放器 + 游戏内音乐/麦克风混音输出工具**。
+
+### ✨ 主要功能
+- 🎼 支持 MP3 / FLAC / WAV / APE / M4A / OGG 等主流格式本地音乐播放
+- 🎮 游戏混音输出：**音乐 + 麦克风** 混合后输入到 VB-CABLE，队友同时听到歌与说话声
+- 🎙️ 独立监听控制：本地监听音量与队友听到的音量独立控制
+- ⚡ 全局快捷键：播放/暂停/切歌/混音开关（Ctrl+Alt+M）
+- 🗒️ 播放列表 / 收藏：本地歌单管理（SQLite）
+- 🌙 暗黑 Aurora 风格界面
+
+### 🛠️ 已修复 Bug
+- ✅ 修复 BASS 引擎调用失败导致混音失效（替换 ffi-napi 为 koffi）
+- ✅ 修复混音开关点击后错误弹出安装窗口
+- ✅ 修复麦克风通道未加入混音器（队友只能听到音乐）
+- ✅ 修复音量调控滑块无效
+- ✅ 修复 BASS 设备名称中文乱码
+- ✅ 修复 BASS_StreamPlay 废弃函数问题
+- ✅ README 图片国内 CDN 加速显示
+
+### 📦 下载说明
+| 文件 | 说明 |
+|------|------|
+| `Aurora Music Setup 0.3.0.exe` | **NSIS 安装版** - 双击安装，自动创建桌面快捷方式 |
+| `Aurora Music 0.3.0.exe` | **Portable 免安装版** - 双击直接运行，U 盘随身用 |
+
+### 🚀 使用前准备
+1. 安装 **VB-CABLE 虚拟驱动**（混音功能必需）
+2. 游戏设置 → 麦克风选择：`CABLE Output (VB-Audio Virtual Cable)`
+3. 游戏设置 → 扬声器保持默认耳机/扬声器（**不要改到 CABLE Input**）
+
+详见 README：https://github.com/JinIilaiQiaoMen/AuroraMusic/blob/main/README.md
+
+---
+⚠️ **仅供学习使用 · 禁止商用 · 后果自负**
+------------------------------------------------------
+
+
+【 第 4 步：上传 EXE 附件】
+在页面中找到 "Attach binaries by dropping them here or selecting them."
+直接从文件夹拖入以下 2 个文件（在 release 目录下）：
+
+  文件 1：C:\Users\rcg16\OneDrive\Desktop\AI项目\AuroraMusic\release\Aurora Music Setup 0.3.0.exe
+  说明：NSIS 安装版，双击安装自动创建桌面图标
+
+  文件 2：C:\Users\rcg16\OneDrive\Desktop\AI项目\AuroraMusic\release\Aurora Music 0.3.0.exe
+  说明：Portable 免安装版，双击直接运行
+
+
+【 第 5 步：发布！】
+☑️ 勾选 "Set as the latest release" （默认已勾）
+点击绿色按钮 【 Publish release 】
+
+
+发布完成后，下载链接：
+  https://github.com/JinIilaiQiaoMen/AuroraMusic/releases/tag/v0.3.0
+======================================================

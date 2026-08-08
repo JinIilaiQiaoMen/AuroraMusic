@@ -7,6 +7,7 @@ CREATE TABLE IF NOT EXISTS songs (
   duration REAL,
   bitrate INTEGER,
   format TEXT,
+  codec TEXT,
   cover_path TEXT,
   favorite INTEGER DEFAULT 0,
   created_at INTEGER,
@@ -47,3 +48,14 @@ CREATE TABLE IF NOT EXISTS settings (
   key TEXT PRIMARY KEY,
   value TEXT
 );
+
+CREATE TABLE IF NOT EXISTS lyrics (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  song_id INTEGER NOT NULL UNIQUE,
+  lrc_path TEXT,
+  lines_json TEXT NOT NULL,
+  title TEXT,
+  artist TEXT,
+  FOREIGN KEY (song_id) REFERENCES songs(id) ON DELETE CASCADE
+);
+CREATE INDEX IF NOT EXISTS idx_lyrics_song ON lyrics(song_id);

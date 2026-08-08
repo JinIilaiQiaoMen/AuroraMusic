@@ -8,12 +8,12 @@ export function registerLibraryIpc() {
     let n = 0
     for (const p of paths) n += await scanFolder(p, db)
     const songs = db.prepare(`
-      SELECT id,path,title,artist,album,duration,format,favorite FROM songs ORDER BY artist,title LIMIT 2000
+      SELECT id,path,title,artist,album,duration,format,codec,favorite FROM songs ORDER BY artist,title LIMIT 2000
     `).all()
     return { inserted: n, songs }
   })
   ipcMain.handle('library:getSongs', async () => {
-    return getDB().prepare(`SELECT id,path,title,artist,album,duration,format,favorite FROM songs ORDER BY artist,title LIMIT 2000`).all()
+    return getDB().prepare(`SELECT id,path,title,artist,album,duration,format,codec,favorite FROM songs ORDER BY artist,title LIMIT 2000`).all()
   })
   ipcMain.handle('library:getPlaylists', async () => {
     const db = getDB()
@@ -116,5 +116,17 @@ export function registerLibraryIpc() {
   ipcMain.handle('library:addPlayHistory', async (_e, songId: number, durationSec: number) => {
     getDB().prepare('INSERT INTO play_history (song_id,played_at,duration_sec) VALUES (?,?,?)').run(songId, Date.now(), durationSec)
     return true
+  })
+
+  // 获取歌曲关联的歌词
+  ipcMain.handle('library:getLyrics', async (_e, songId: number) => {
+    const row = getDB().prepare('SELECT * FROM lyrics WHERE song_id = ?').get(songId) as any
+    if (!row) return null
+    return {
+      lrcPath: row.lrc_path,
+      lines: JSON.parse(row.lines_json || '[]'),
+      title: row.title,
+      artist: row.artist,
+    }
   })
 }

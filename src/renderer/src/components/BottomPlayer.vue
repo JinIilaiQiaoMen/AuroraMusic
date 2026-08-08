@@ -7,6 +7,7 @@ import { useLibraryStore } from '@/stores/library'
 import { useUiStore } from '@/stores/ui'
 import { useAudioStore } from '@/stores/audio'
 import { fmtTime } from '@/utils/format'
+import LyricsPanel from './LyricsPanel.vue'
 
 const player = usePlayerStore()
 const ui = useUiStore()
@@ -448,6 +449,7 @@ function handleAction(a: string) {
         <span class="vi">🔊</span>
         <input type="range" v-model.number="volume" min="0" max="1" step="0.01" class="vs">
       </div>
+      <LyricsPanel />
       <button class="q" title="播放队列" @click="openQueue">☰</button>
     </div>
   </GlassCard>

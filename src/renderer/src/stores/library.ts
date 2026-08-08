@@ -3,7 +3,7 @@ import { ref, computed, watch } from 'vue'
 import { useUiStore } from './ui'
 import { usePlayerStore } from './player'
 
-export interface Song { id: number; path: string; title: string; artist: string; album: string; duration: number; format: string; favorite: number }
+export interface Song { id: number; path: string; title: string; artist: string; album: string; duration: number; format: string; codec?: string; favorite: number }
 export interface Playlist { id: number; name: string; description?: string; songs: Song[] }
 
 export const useLibraryStore = defineStore('library', () => {
