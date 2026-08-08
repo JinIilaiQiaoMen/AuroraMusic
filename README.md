@@ -80,12 +80,27 @@ AuroraMusic 是一款 **Electron + Vue 3** 开发的 **本地音乐播放器 + �
 
 ## 🚀 快速开始
 
-### 系统要求
+### 📦 方式一：下载预编译 EXE（推荐普通用户，双击即可运行）
+
+直接到 **[Releases 页面](https://github.com/JinIilaiQiaoMen/AuroraMusic/releases)** 下载打包好的文件：
+
+| 文件 | 说明 | 适用场景 |
+|------|------|---------|
+| `Aurora Music Setup 0.3.0.exe` | **NSIS 安装版**（双击安装到桌面/开始菜单） | 想长期使用、想要图标的用户 |
+| `Aurora Music 0.3.0.exe` | **Portable 免安装版**（双击直接运行） | 拷给朋友、U 盘随身用 |
+
+> 💡 **一键启动**：下载后**双击 exe** 即可打开，无需安装 Node.js、无需 npm install！
+>
+> 安装完成后，桌面和开始菜单会自动创建 `Aurora Music` 快捷方式，双击即可启动。
+
+### 🛠️ 方式二：从源码运行（开发者）
+
+#### 系统要求
 - Windows 10 / 11 **64 位**（仅 64 位支持）
 - 已安装 VB-CABLE 虚拟驱动
 - Node.js ≥ 18
 
-### 1. 安装 VB-CABLE 虚拟驱动
+#### 1. 安装 VB-CABLE 虚拟驱动
 VB-CABLE 驱动安装包已放在 `_extras/thirdparty-src/VBCABLE_Driver_Pack45/`：
 1. 以管理员身份运行 `VBCABLE_Setup_x64.exe`
 2. 安装完成后重启（或禁用/启用声卡）
@@ -93,21 +108,26 @@ VB-CABLE 驱动安装包已放在 `_extras/thirdparty-src/VBCABLE_Driver_Pack45/
    - **播放设备**：`CABLE Input (VB-Audio Virtual Cable)`
    - **录音设备**：`CABLE Output (VB-Audio Virtual Cable)`
 
-### 2. 安装依赖
+#### 2. 安装依赖
 ```powershell
 cd AuroraMusic
 npm install
 ```
 
-### 3. 开发模式运行
+#### 3. 开发模式运行
 ```powershell
 npm run dev
 ```
 
-### 4. 构建生产包
+或者双击 `_extras/scripts/启动_AuroraMusic.bat` 一键启动。
+
+#### 4. 构建生产包（自己打 EXE）
 ```powershell
 npm run build      # 编译主进程 + 渲染进程
 npm run dist       # 打包 NSIS 安装包 + portable 单文件
+# 打包产物在 release/ 目录下：
+#   release\Aurora Music Setup 0.3.0.exe   ← 安装版
+#   release\Aurora Music 0.3.0.exe         ← 免安装版
 ```
 
 ---
