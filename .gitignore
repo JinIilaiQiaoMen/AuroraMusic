@@ -45,3 +45,6 @@ diag-*.js
 
 # 第三方源代码归档（体积大，建议独立下载/从官方获取）
 _extras/thirdparty-src/
+
+# 临时截图与调试文件
+github_page*.png
