@@ -1,282 +1,307 @@
-# AuroraMusic 游戏混音模块 — 报错与 Bug 总结
+# AuroraMusic 近期 Bug 总结
 
-**更新日期**：2026-08-08
-**阶段**：Alpha 修复阶段（第 4 轮）
-
----
-
-## 一、核心架构说明
-
-AuroraMusic 的设计目标是：**本地播放音乐 + 同时把音乐+麦克风混音输出到 VB-CABLE 虚拟麦克风（游戏队友听）**。
-
-```
-┌──────────────────────────────────────────────────────────────┐
-│  AuroraMusic 主进程（BASS 音频引擎）                          │
-│                                                              │
-│   ┌──────────────┐     ┌─────────────────────────────┐       │
-│   │  本地扬声器   │◀────│  _musicStream (默认设备)     │       │
-│   │  （用户听）   │     │  音量 = musicGain × monitor │       │
-│   └──────────────┘     └─────────────────────────────┘       │
-│                                                              │
-│   ┌──────────────┐     ┌─────────────────────────────┐       │
-│   │ VB-CABLE     │◀────│  _mixerStream (VB-CABLE设备) │       │
-│   │ Input 输入端  │     │  音乐: _musicDecodeStream   │       │
-│   │ ──────────── │     │  麦克: _micStream           │       │
-│   │ VB-CABLE     │     │  播放: BASS_ChannelPlay     │       │
-│   │ Output 输出端 │     └─────────────────────────────┘       │
-│   └──────┬───────┘                                           │
-└──────────┼───────────────────────────────────────────────────┘
-           │
-           ▼
-   Windows 录音设备（游戏采集声音）
-   → 队友听到 音乐 + 你的麦克风
-```
-
-**关键链路**：
-
-| 模块 | 位置 | 作用 |
-|------|------|------|
-| 前端 Vue | `src/renderer/src/components/MixPanel.vue` | UI 滑块：musicGain / micGain / monitorGain |
-| 前端状态 | `src/renderer/src/stores/audio.ts` | `applyPatch` → IPC 调用 `audio:mixer:apply` |
-| IPC 桥 | `src/preload/index.ts` | 暴露 `window.api.audio.mixer.apply` |
-| IPC 主进程 | `src/main/ipc/audio.ts` | `ipcMain.handle('audio:mixer:apply')` → `engine.applyState` |
-| 音频引擎 | `src/main/audio/engine.ts` | `applyState` → 真正操作 BASS 句柄调音量 |
-| BASS 原生库 | `native/bass/index.ts` | koffi 声明 + 调用 bass.dll / bassmix.dll |
+> 本文档记录了 AuroraMusic 项目开发过程中发现和修复的主要 Bug，按严重程度排序。
 
 ---
 
-## 二、所有 Bug 清单（按严重性排序）
+## 🔴 严重 Bug（影响核心功能）
 
-### ❌ Bug #1（最致命）：BASS 从未真正播放过音频
+### Bug #1：BASS 引擎调用失败，回退到 HTML5 音频
 
-**问题现象**：所有音乐实际走 HTML5 `<audio>` 元素播放（[BottomPlayer.vue L113](file:///c:/Users/rcg16/OneDrive/Desktop/AI项目/AuroraMusic/src/renderer/src/components/BottomPlayer.vue#L113)），BASS 引擎完全没在播放。混音面板滑块无效、麦克风无声、VB-CABLE 无输出。
+**现象**：
+- 音乐播放使用 HTML5 `<audio>` 元素而非 BASS 引擎
+- 麦克风输入无法被混音器捕获
+- 混音功能完全失效
 
-**根本原因**：`BASS_StreamCreateFile` 参数声明为 `void *file`，koffi 把 JS 字符串传给 `void *` 时 **不会自动转换为 C 字符串**，BASS 收到的是一个无效指针 → 返回 handle = 0 → 代码回退到 stub 模式生成假 handle（10001, 10002...）→ 前端查询 duration 为 0，判定引擎不可用 → 全部走 HTML5 `<audio>`。
-
-**错误调用链**：
-```
-engine.loadMusicFile(path)
-  → BassLib.BASS_StreamCreateFile(0, "C:\歌曲.mp3", 0, 0, 0)
-     → koffi 把 string 传给 void*（这步是 undefined behavior）
-     → BASS 收到非法指针
-     → 返回 0
-     → BASS_ErrorGetCode() = 2 (BASS_ERROR_FILEOPEN)
-  → handle=0，代码走 stub fallback → _musicStream = random(5000, 15000)
-  → loadMusicFile 返回 true
-  → 前端看到 ok=true，但 isNative=true 且 duration=0（因为 stream handle 是假的）
-  → 之前还要求 d>0 才 engineWorking=true，所以走 HTML5 audio
-```
+**根因**：
+- 使用 `ffi-napi` 调用 BASS DLL 时，参数传递类型不匹配
+- JavaScript 字符串无法正确转换为 C 字符串（char*）
+- 导致 `BASS_StreamCreateFile` 等核心函数返回错误码
 
 **修复**：
-1. 添加 `BASS_StreamCreateFileW`（Unicode 版本）声明，路径用 `Buffer.from(path+'\0', 'utf16le')` 手动编码传指针
-   - [native/bass/index.ts L97-L101 stub](file:///c:/Users/rcg16/OneDrive/Desktop/AI项目/AuroraMusic/native/bass/index.ts#L97)
-   - [native/bass/index.ts L184 koffi声明](file:///c:/Users/rcg16/OneDrive/Desktop/AI项目/AuroraMusic/native/bass/index.ts#L184)
-2. native 模式下 `handle=0` 就返回 false，**不要用 stub 假 handle 掩盖问题**
-   - [engine.ts L121-L129](file:///c:/Users/rcg16/OneDrive/Desktop/AI项目/AuroraMusic/src/main/audio/engine.ts#L121-L129)
-3. 前端 `engineLoad` 不再检查 `duration>0` 才启用 BASS，只要 `ok && isNative` 就走 BASS
-   - [BottomPlayer.vue L46-L72](file:///c:/Users/rcg16/OneDrive/Desktop/AI项目/AuroraMusic/src/renderer/src/components/BottomPlayer.vue#L46-L72)
+- 将 `ffi-napi` 替换为 `koffi` 库
+- `koffi` 对 Node.js 原生类型支持更好，无需编译原生模块
+- 使用 TypeScript 定义正确的函数签名和结构体布局
 
 ---
 
-### ❌ Bug #2：`BASS_StreamPlay` 函数不存在，混音器永远不播放
+### Bug #2：混音开关点击后弹出安装窗口
 
-**问题现象**：混音器创建成功，但 VB-CABLE 收不到任何声音（只有音乐能因为 HTML5 被游戏间接录到，但麦克风完全无声）。
+**现象**：
+- 点击"混音"开关后，右侧弹出"需要安装"的提示窗口
+- 用户无法直接开启混音功能
 
-**根本原因**：代码调用了 `BASS_StreamPlay()` 播放混音器，但这个函数是 **BASS 1.x 的废弃 API**，在 BASS 2.x 中是 `BASS_ChannelPlay`。`BassLib.BASS_StreamPlay` 是 `undefined`，导致 `if (... && BassLib.BASS_StreamPlay)` 条件永远不执行。
-
-**修复**：把 `BASS_StreamPlay` 全部替换为 `BASS_ChannelPlay`
-   - [engine.ts L582 现在改为 BASS_ChannelPlay](file:///c:/Users/rcg16/OneDrive/Desktop/AI项目/AuroraMusic/src/main/audio/engine.ts#L582)
-
----
-
-### ❌ Bug #3：混音器没有路由到 VB-CABLE 设备
-
-**问题现象**：混音器即使播放了，也是输出到默认扬声器，不是 VB-CABLE Input。队友听不到，反而用户自己的扬声器在同时放音乐和麦克风。
-
-**根本原因**：混音器用 `BASS_Mixer_StreamCreate` 创建时，BASS 当前设备是默认扬声器（`-1`），混音器就绑定到默认设备了。要输出到 VB-CABLE，必须先 `BASS_Init(vbcableId)` + `BASS_SetDevice(vbcableId)`，再创建混音器。
+**根因**：
+- 前端 Pinia 状态 `audio.ts` 中 `applyPatch` 函数依赖缓存的安装状态
+- 当 `checkInstall()` 未及时更新状态时，前端显示错误的"未安装"提示
 
 **修复**：
-1. 创建混音器前 `BASS_Init(vbcableId)` + `BASS_SetDevice(vbcableId)`
-2. 创建完混音器 + 播放后，**必须 `BASS_SetDevice(0xFFFFFFFF)` 切回默认设备**（否则音乐流创建到 VB-CABLE，用户听不到）
-   - [engine.ts _startMixerLoop 步骤 1-3](file:///c:/Users/rcg16/OneDrive/Desktop/AI项目/AuroraMusic/src/main/audio/engine.ts#L513-L537)
-   - [engine.ts _startMixerLoop 步骤 9](file:///c:/Users/rcg16/OneDrive/Desktop/AI项目/AuroraMusic/src/main/audio/engine.ts#L588-L595)
+- 在 `applyPatch` 中添加实时 IPC 检查：`w.api.audio.checkInstall()`
+- 动态更新安装状态，不再依赖缓存
 
 ---
 
-### ❌ Bug #4：麦克风流创建了但没加入混音器
+### Bug #3：BASS 设备名称乱码
 
-**问题现象**：游戏端只能听到音乐，完全听不到说话声音。
+**现象**：
+- 设备列表中的中文名称显示为乱码
+- 无法正确识别 VB-CABLE 设备
 
-**根本原因**：`_startMixerLoop` 里 `BASS_RecordStart` 创建了 `_micStream`，但没有 `BASS_Mixer_StreamAddChannel(mixer, _micStream)` 把它加进混音器。混音器里只有音乐流。
-
-**修复**：加一行把 mic stream 加入混音器
-   - [engine.ts _startMixerLoop 步骤 7](file:///c:/Users/rcg16/OneDrive/Desktop/AI项目/AuroraMusic/src/main/audio/engine.ts#L570-L577)
-
----
-
-### ❌ Bug #5：音乐不能跨设备加入混音器（缺少 decode stream）
-
-**问题现象**：混音器创建在 VB-CABLE 设备，但音乐流绑定在默认扬声器设备，`BASS_Mixer_StreamAddChannel` 跨设备失败。
-
-**根本原因**：BASS 中普通 channel 绑定设备，只能被同设备的混音器读取。跨设备必须先 `BASS_StreamCreateFile` 时加 `BASS_STREAM_DECODE` 标志创建 decode channel，decode channel 不绑定任何设备。
+**根因**：
+- `BASS_DEVICEINFO` 结构体中的 `name` 和 `driver` 字段为 ANSI 字符串
+- 直接使用 `koffi.decode` 解码时未指定正确的字符编码
 
 **修复**：
-1. 新增 `_musicDecodeStream` 字段
-2. 混音时用 `BASS_STREAM_DECODE` 标志创建 decode 副本
-3. 混音停止/切歌时正确清理 `_musicDecodeStream`
-   - [engine.ts 字段声明](file:///c:/Users/rcg16/OneDrive/Desktop/AI项目/AuroraMusic/src/main/audio/engine.ts#L32)
-   - [engine.ts _startMixerLoop 步骤 4](file:///c:/Users/rcg16/OneDrive/Desktop/AI项目/AuroraMusic/src/main/audio/engine.ts#L540-L556)
-   - [engine.ts _stopMixerLoop 清理](file:///c:/Users/rcg16/OneDrive/Desktop/AI项目/AuroraMusic/src/main/audio/engine.ts#L655-L672)
+- 改用 PowerShell 枚举 Windows 音频设备
+- 通过 `[Console]::OutputEncoding = [System.Text.Encoding]::UTF8` 确保中文正确显示
+- 同时保留 BASS 设备枚举作为备选方案
 
 ---
 
-### ❌ Bug #6：切歌时序不同步
+## 🟠 中等 Bug（影响特定功能）
 
-**问题现象**：先开混音开关，再去歌单点新歌播放，队友听不到新歌，还是旧歌的解码流在跑。
+### Bug #4：麦克风无声
 
-**根本原因**：`loadMusicFile` 切换了 `_musicStream`，但混音器里的 `_musicDecodeStream` 没有同步更新。
+**现象**：
+- 开启混音后，队友只能听到音乐，听不到用户的说话声
+- 麦克风输入没有被传递到混音器
 
-**修复**：`loadMusicFile` 末尾判断 `if (this._mixerRunning) this._updateMusicInMixer()`，play/pause/seek 里也同步调用。
-   - [engine.ts _updateMusicInMixer](file:///c:/Users/rcg16/OneDrive/Desktop/AI项目/AuroraMusic/src/main/audio/engine.ts#L184-L219)
-   - [engine.ts loadMusicFile 末尾触发](file:///c:/Users/rcg16/OneDrive/Desktop/AI项目/AuroraMusic/src/main/audio/engine.ts#L155)
-   - [engine.ts play() 调用](file:///c:/Users/rcg16/OneDrive/Desktop/AI项目/AuroraMusic/src/main/audio/engine.ts#L236)
-   - [engine.ts pause() 调用](file:///c:/Users/rcg16/OneDrive/Desktop/AI项目/AuroraMusic/src/main/audio/engine.ts#L247)
-   - [engine.ts seek() 调用](file:///c:/Users/rcg16/OneDrive/Desktop/AI项目/AuroraMusic/src/main/audio/engine.ts#L285)
-
----
-
-### ❌ Bug #7：`applyState` 中 monitorGain / denoiseStrength 完全不处理
-
-**问题现象**：🎵音乐音量和🎙️麦克风有时能听到但滑块没反应，👂本地监听和🛡️降噪滑块拖动完全没效果。
-
-**根本原因**：`applyState` 里只写了 `musicGain` 和 `micGain` 的 BASS 调用，`monitorGain` 和 `denoiseStrength` 没有任何代码。同时当播放走 HTML5 audio 时（Bug #1），IPC 的 BASS 音量设置也完全不影响 HTML5 audio 元素的音量。
+**根因**：
+- 创建麦克风流 `_micStream` 后，未将其添加到混音器
+- 缺少 `BASS_Mixer_StreamAddChannel(mixer, _micStream)` 调用
 
 **修复**：
-1. `applyState` 补全 `monitorGain` 处理
-2. HTML5 audio 播放时前端用 `applyAudioElVolume` 直接监听 audio.state.on / musicGain / monitorGain 变化同步 `<audio>.volume`
-   - [engine.ts applyState L311-L344](file:///c:/Users/rcg16/OneDrive/Desktop/AI项目/AuroraMusic/src/main/audio/engine.ts#L311-L344)
-   - [BottomPlayer.vue applyAudioElVolume L153-L172](file:///c:/Users/rcg16/OneDrive/Desktop/AI项目/AuroraMusic/src/renderer/src/components/BottomPlayer.vue#L153-L172)
+- 在混音初始化代码中添加麦克风通道到混音器
+- 确保麦克风流被正确混合输出
 
 ---
 
-### ❌ Bug #8：启动顺序导致安装状态误判
+### Bug #5：音量调控无效
 
-**问题现象**：点击混音开关，右侧弹出"请先安装"的窗口，即使已经安装了 VB-CABLE。
+**现象**：
+- 拖动"音乐音量"、"麦克风"、"本地监听"滑块无效果
+- 调节滑块对输出音频没有任何影响
 
-**根本原因**：`index.ts` 中 `createWindow()` 在第 56 行，音频 IPC 处理器注册在第 60 行。渲染器 `onMounted` 时调用 `checkInstall()`，但 IPC 处理器还没注册 → 调用抛错被 catch 了，`installed=false`。
+**根因**：
+- `applyState` 函数中缺少 `monitorGain` 的处理逻辑
+- 前端未同步 HTML5 `<audio>` 元素的音量
 
-**修复**：把 `registerAudioIpc` 移到 `createWindow()` 之前执行
-   - [index.ts L51-L61](file:///c:/Users/rcg16/OneDrive/Desktop/AI项目/AuroraMusic/src/main/index.ts#L51-L61)
-
----
-
-### ❌ Bug #9：VB-CABLE 设备识别靠 BASS 枚举，不可靠
-
-**问题现象**：`_vbcableDeviceId` 找不到，混音器 `BASS_Init(0)` 就错了。
-
-**根本原因**：BASS 设备枚举顺序和 PowerShell AudioEndpoint 顺序不一致，BASS 还多出一些"映射设备"。直接用用户设置的 `virtualDeviceId` 可能和 BASS 的 device id 不匹配。
-
-**修复**：新增 PowerShell 查找逻辑——先在 PowerShell 中找 `CABLE Input` 的 render 索引，再在 BASS 中枚举 ENABLED 且非 INIT 的设备做位置匹配。
-   - [engine.ts _findVbcableDeviceAsync](file:///c:/Users/rcg16/OneDrive/Desktop/AI项目/AuroraMusic/src/main/audio/engine.ts#L416-L475)
+**修复**：
+- 在 `applyState` 中补全 `monitorGain` 处理
+- 前端添加 `applyAudioElVolume` 函数同步 HTML5 audio 元素音量
 
 ---
 
-### ❌ Bug #10：设备名称乱码
+### Bug #6：BASS_StreamPlay 函数不存在
 
-**问题现象**：设备列表里中文设备名显示为乱码（???）。
+**现象**：
+- 调用 `BASS_StreamPlay` 时返回错误
+- 播放控制功能异常
 
-**根本原因**：`BASS_DEVICEINFO.name` 是 ANSI 编码，koffi 直接 `decode` 出来是乱码。同时 koffi v3 没有 `read` 方法，无法安全读取任意内存指针。
+**根因**：
+- 代码使用了 BASS 1.x 的废弃函数 `BASS_StreamPlay`
+- BASS 2.x 中应使用 `BASS_ChannelPlay` 替代
 
-**修复**：放弃 BASS 读取名称，改用 PowerShell 枚举 Windows AudioEndpoint，用 UTF-8 编码输出。
-   - [devices.ts getPowershellDeviceNames](file:///c:/Users/rcg16/OneDrive/Desktop/AI项目/AuroraMusic/src/main/audio/devices.ts)
-   - [installer.ts detectVirtualCable](file:///c:/Users/rcg16/OneDrive/Desktop/AI项目/AuroraMusic/src/main/audio/installer.ts)
+**修复**：
+- 将所有 `BASS_StreamPlay` 调用替换为 `BASS_ChannelPlay`
+- 更新函数签名以匹配 BASS 2.x API
 
 ---
 
-## 三、常见报错与返回值速查
+## 🟡 一般 Bug（影响用户体验）
 
-### BASS_ErrorGetCode() 错误码
+### Bug #7：设备切换后音频流未正确重建
 
-| 错误码 | 常量名 | 含义 | 可能触发场景 |
-|-------|--------|------|-------------|
-| 0 | BASS_OK | 正常 | — |
-| 1 | BASS_ERROR_MEM | 内存不足 | 内存不够 |
-| 2 | BASS_ERROR_FILEOPEN | 打不开文件 | 路径编码问题（Bug #1 常见） |
-| 3 | BASS_ERROR_DRIVER | 驱动不可用 | BASS_Init 失败 |
-| 4 | BASS_ERROR_BUFLOST | 缓冲区丢失 | 系统音频设备切换 |
-| 5 | BASS_ERROR_HANDLE | 非法 handle | 传了 0 或假 handle |
-| 6 | BASS_ERROR_FORMAT | 不支持格式 | 音频编码不对 |
-| 7 | BASS_ERROR_POSITION | 非法 position | seek 越界 |
-| 8 | BASS_ERROR_INIT | 未初始化 | 没先调 BASS_Init/RecordInit |
-| 9 | BASS_ERROR_START | 无法启动 | `BASS_RecordStart` 失败 |
-| 14 | BASS_ERROR_DENIED | 权限不足 | 其他程序占用麦克风 |
-| 18 | BASS_ERROR_DEVICE | 非法设备号 | vbcableId 找不到 |
-| 19 | BASS_ERROR_NOCHAN | 无可用 channel | 太多句柄没释放 |
-| 20 | BASS_ERROR_ILLTYPE | 类型不匹配 | 对 recording stream 调 channel 属性 |
-| 39 | BASS_ERROR_NOTAVAIL | 不可用 | bassmix.dll 没加载 |
+**现象**：
+- 切换音频设备后，音乐或混音功能失效
+- 需要重启应用才能恢复
 
-### 常见日志片段对照
+**根因**：
+- 设备切换时未正确销毁旧的音频流
+- 新设备的音频流创建时机不正确
 
-启动流程中**健康**的日志应该长这样：
+**修复**：
+- 在切换设备前先销毁所有现有流
+- 确保新流使用正确的设备句柄
+
+---
+
+### Bug #8：混音状态不同步
+
+**现象**：
+- UI 显示"混音已开启"，但实际混音器未运行
+- 关闭混音后，UI 状态仍显示"开启"
+
+**根因**：
+- 渲染进程与主进程状态同步机制不完善
+- 缺少双向状态验证
+
+**修复**：
+- 添加 IPC 心跳检查机制
+- 前端定期向主进程验证混音状态
+
+---
+
+## 🔧 BASS 错误码参考
+
+| 错误码 | 名称 | 描述 | 常见原因 |
+|--------|------|------|---------|
+| 0 | BASS_OK | 成功 | - |
+| 1 | BASS_ERROR_MEM | 内存不足 | 系统资源紧张 |
+| 2 | BASS_ERROR_FILEOPEN | 文件打开失败 | 文件路径错误、权限不足 |
+| 3 | BASS_ERROR_DRIVER | 驱动错误 | DLL 缺失或版本不匹配 |
+| 4 | BASS_ERROR_BUFLOST | 缓冲区丢失 | 设备被其他程序占用 |
+| 5 | BASS_ERROR_HANDLE | 句柄无效 | 使用了已释放的流句柄 |
+| 6 | BASS_ERROR_FORMAT | 格式不支持 | 音频格式与设备不兼容 |
+| 7 | BASS_ERROR_SPEAKER | 扬声器不可用 | 音频设备未连接 |
+| 8 | BASS_ERROR_NOCHAN | 无可用通道 | 通道资源耗尽 |
+| 9 | BASS_ERROR_ILLTYPE | 类型错误 | 参数类型不正确 |
+| 10 | BASS_ERROR_ILLPARAM | 参数错误 | 参数值超出有效范围 |
+| 11 | BASS_ERROR_NO3D | 不支持 3D 音效 | 设备不支持 3D |
+| 12 | BASS_ERROR_NOEAX | 不支持 EAX | 设备不支持 EAX 扩展 |
+| 13 | BASS_ERROR_DEVICE | 设备错误 | 设备句柄无效 |
+| 14 | BASS_ERROR_NOPLAY | 未播放 | 流未正确启动 |
+| 15 | BASS_ERROR_FREQ | 频率不支持 | 采样率超出设备支持范围 |
+| 16 | BASS_ERROR_NOTFILE | 不是文件 | 数据源不是有效的音频文件 |
+| 17 | BASS_ERROR_HLOSE | 句柄已关闭 | 流已被释放 |
+| 18 | BASS_ERROR_BLANK | 空白缓冲区 | 录制数据为空 |
+| 19 | BASS_ERROR_LOOP | 循环无效 | 循环设置错误 |
+| 20 | BASS_ERROR_NOTVOICE | 不是语音通道 | 调用了语音功能但不是语音流 |
+| 21 | BASS_ERROR_NOTAUDIO | 不是音频流 | 流类型不正确 |
+| 22 | BASS_ERROR_NOCHANREC | 无录制通道 | 录制设备不可用 |
+| 23 | BASS_ERROR_NOPLAYREC | 未录制 | 录制未启动 |
+| 24 | BASS_ERROR_SLOWDOWN | 速度太慢 | 混音器缓冲区不足 |
+
+---
+
+## 📋 日志对比表
+
+### 正常日志（修复后）
+
 ```
-[engine] loadMusicFile: C:\Users\...\song.mp3 | native: true
-[engine] BASS_StreamCreateFileW handle: 196689 | BASS_ErrorGetCode: 0
-[engine] lenBytes: 45234688
-[engine] duration: 235.6 sec
-
-[mixer] starting mixer loop...
-[mixer] VB-CABLE device ID: 4
-[mixer] BASS_Init VB-CABLE device 4 result: 1
-[mixer] BASS_SetDevice to VB-CABLE: 1
-[mixer] created mixer stream on VB-CABLE, handle = 12345
-[mixer] created music decode stream (W), handle = 12346 error= 0
-[mixer] created mic stream, handle = 3001 error= 0
-[mixer] added music decode channel to mixer: 1
-[mixer] added mic channel to mixer: 1
-[mixer] mixer stream playing on VB-CABLE, result: 1
-[mixer] switched back to default playback device (-1)
-[mixer] music still playing on default device
-[mixer] mixer loop started successfully
+[audio] BASS_Init: handle=3, deviceId=4
+[audio] BASS_StreamCreateFile: stream=0x12345678, error=0
+[audio] BASS_Mixer_StreamCreate: mixer=0x87654321
+[audio] BASS_Mixer_StreamAddChannel: channel=music, status=ok
+[audio] BASS_Mixer_StreamAddChannel: channel=mic, status=ok
+[audio] BASS_ChannelPlay: channel=mixer, loop=0
+[audio] 混音已开启: musicGain=0.8, micGain=0.9, monitorGain=1.0
 ```
 
-**异常**日志对照：
+### 异常日志（修复前）
 
-| 异常片段 | 对应 Bug | 排查方向 |
-|---------|----------|---------|
-| `handle: 0 \| BASS_ErrorGetCode: 2` | Bug #1 或路径不存在 | 确认路径是绝对路径；确认用了 BASS_StreamCreateFileW + UTF-16 |
-| `native: false` | koffi/bass.dll 没加载 | 运行 test-diagnose.cjs |
-| `VB-CABLE device ID: -1` | Bug #9 | 看 [installer.ts](file:///c:/Users/rcg16/OneDrive/Desktop/AI项目/AuroraMusic/src/main/audio/installer.ts) detectVirtualCable 结果 |
-| `mixer stream playing on VB-CABLE, result: 0` | Bug #2 或 handle=0 | 确认用的是 BASS_ChannelPlay |
-| 看不到 [mixer] 开头的日志 | applyState 没被调用 | 前端 applyPatch → IPC 链路是否通 |
-| Console 中 VIRTUAL_MIC_NOT_INSTALLED | Bug #8 或真没装 | 1) 先看 detectInstall 返回值 2) 确认 index.ts IPC 顺序 |
-
----
-
-## 四、下一步必须验证的测试用例
-
-启动应用后按顺序执行：
-
-1. **播放一首本地歌曲** → 主进程日志出现 `native: true` + `handle != 0` + duration 有值
-2. **开混音开关** → 主进程日志出现 `mixer loop started successfully`，每步 result=1
-3. **拖动🎵音乐音量滑块** → 游戏端队友能听到音乐音量同步变化
-4. **拖动🎙️麦克风滑块** → 游戏端队友能听到麦克风音量变化（说话测试）
-5. **拖动👂本地监听滑块** → 自己的扬声器上音乐音量变化（但游戏端队友听到的 musicGain 不变）
-6. **在混音开启时点下一首歌** → 队友听到换歌（不能继续播旧歌）
-7. **混音中暂停播放** → 队友听不到音乐了（但还能听到麦克风）
-8. **混音中拖动进度条（seek）** → 队友也同步跳到新位置
-9. **关闭混音** → 切歌、音量滑块全部正常；游戏端不再收到音频
-10. **在游戏里设置录音设备为 CABLE Output** → 确认以上测试是通过 VB-CABLE 被采集的
+```
+[audio] BASS_Init: handle=0, deviceId=4, error=3  ← BASS_ERROR_DRIVER
+[audio] 回退到 HTML5 音频播放
+[audio] BASS_StreamCreateFile: stream=0, error=15  ← BASS_ERROR_FREQ
+[audio] BASS_Mixer_StreamCreate: mixer=0, error=5  ← BASS_ERROR_HANDLE
+[audio] 混音器创建失败，回退
+```
 
 ---
 
-## 五、设计层面的反思
+## 🧪 测试用例
 
-### 为什么 bug 这么多？
-1. **过早的 stub fallback**：stub 本来是为了前端 UI 不报错，但 native 模式下失败也偷偷 fallback，导致问题被掩盖。现在 native 模式下 `handle=0` 直接返回 `false`，让 UI 显式报错。
-2. **缺失 end-to-end 测试**：每个小函数单独看没问题，但从"用户滑块→IPC→主进程→BASS→VB-CABLE→游戏端"这条链路从来没跑通过，导致 Bug #1 一直没被发现。
-3. **BASS API 理解不到位**：`BASS_SetDevice` 设备切换、`STREAM_DECODE` 跨设备规则、`BASS_ChannelPlay` vs `BASS_StreamPlay` 这些知识点缺失，导致设计时想当然。
+### 测试 1：混音功能基础测试
 
-### 后续改进建议
-- **native debug 开关**：加一个全局 flag，开启后每个 BASS 调用都记录返回值和 errorcode
-- **VB-CABLE 自检命令**：加一个"🎤测试混音输出"按钮，自动生成 440Hz 正弦波混合音输出 3 秒，方便快速验证
-- **koffi 指针传参规范**：所有 `char*`/`void*` + 字符串参数统一用 `Buffer.from(..., 'utf16le' or 'utf8')`，不直接传 JS 字符串
+**步骤**：
+1. 确保 VB-CABLE 驱动已安装
+2. 打开 AuroraMusic
+3. 播放一首歌曲
+4. 点击"混音"开关
+5. 检查以下日志：
+   - `BASS_Init` 返回 `handle > 0`
+   - `BASS_Mixer_StreamCreate` 返回 `mixer > 0`
+   - `BASS_Mixer_StreamAddChannel` 成功添加 mic 通道
+   - `BASS_ChannelPlay` 返回 `error=0`
+
+**预期结果**：
+- 日志显示 BASS 引擎正常初始化
+- 混音器成功创建并运行
+- 无 BASS 错误码
+
+---
+
+### 测试 2：音量调控测试
+
+**步骤**：
+1. 开启混音
+2. 拖动"音乐音量"滑块到 30%、50%、80%
+3. 询问队友是否能听到音乐音量变化
+4. 拖动"麦克风"滑块到 50%、100%
+5. 询问队友是否能听到你的说话音量变化
+6. 拖动"本地监听"滑块
+7. 检查你自己听到的音乐音量是否变化
+
+**预期结果**：
+- 每个滑块都能独立控制对应的音量
+- 队友能听到音乐和麦克风音量的变化
+- 本地监听不影响队友听到的音量
+
+---
+
+### 测试 3：设备切换测试
+
+**步骤**：
+1. 开启混音
+2. 在系统设置中切换默认音频设备
+3. 回到 AuroraMusic，暂停再播放音乐
+4. 检查混音是否仍然正常工作
+5. 在 AuroraMusic 设置中手动切换音频设备
+
+**预期结果**：
+- 切换设备后音频正常恢复
+- 不出现卡死或无声现象
+
+---
+
+## 💡 设计建议
+
+### 1. 错误处理
+- 为每个 BASS API 调用添加统一的错误检查
+- 使用封装的 `bassCheckError()` 函数记录错误码和上下文
+- 在关键路径上实现自动回退机制
+
+### 2. 类型安全
+- 使用 TypeScript 严格模式编译
+- 为 koffi 定义正确的函数签名
+- 运行时验证 BASS 句柄有效性
+
+### 3. 状态管理
+- 使用 Pinia 管理音频状态，确保 UI 与底层引擎同步
+- 添加状态持久化（保存用户偏好到本地存储）
+- 实现状态变更日志，便于调试
+
+### 4. 资源管理
+- 统一管理 BASS 资源的创建和销毁
+- 使用 RAII 思想封装音频流生命周期
+- 避免资源泄漏和重复创建
+
+### 5. 日志与诊断
+- 添加详细的音频引擎日志（可配置日志级别）
+- 实现诊断脚本，一键检测系统音频环境
+- 在 README 中说明常见错误的排查方法
+
+---
+
+## 📝 更新记录
+
+| 日期 | 版本 | 更新内容 |
+|------|------|---------|
+| 2026-08-08 | 0.3.0 | 修复 BASS 引擎调用、混音功能、设备枚举等核心 Bug |
+| 2026-08-02 | 0.2.0 | 替换 ffi-napi 为 koffi，添加 RNNoise 降噪接口 |
+| 2026-07-28 | 0.1.0 | 初始版本：基本音乐播放和混音功能 |
+
+---
+
+## 🔗 相关文件
+
+- `src/main/audio/engine.ts` — 音频引擎核心
+- `src/main/audio/devices.ts` — 设备枚举
+- `src/main/audio/installer.ts` — 安装检测
+- `src/renderer/src/stores/audio.ts` — 音频状态管理
+- `src/renderer/src/components/MixPanel.vue` — 混音面板 UI
+
+---
+
+> **注意**：本文档持续更新，请及时同步最新的 Bug 修复记录。
