@@ -1,0 +1,47 @@
+# 依赖与编译产物
+node_modules/
+out/
+dist/
+
+# 打包产物（release 文件夹非常大，不提交）
+release/
+release_new/
+_extras/build-archive/release/
+_extras/build-archive/release_new/
+
+# 日志
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# 系统文件
+.DS_Store
+Thumbs.db
+desktop.ini
+*.lnk
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# 环境变量
+.env
+.env.local
+.env.*.local
+
+# 缓存
+.cache/
+.temp/
+tmp/
+
+# 诊断脚本（临时使用，不提交）
+diag_rate.js
+test-*.cjs
+test-*.mjs
+diag-*.js
+
+# 第三方源代码归档（体积大，建议独立下载/从官方获取）
+_extras/thirdparty-src/

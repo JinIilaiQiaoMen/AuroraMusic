@@ -1,0 +1,74 @@
+⚠️  重要声明（Important Notice）
+======================================================================
+
+                          仅供学习使用
+                   (FOR EDUCATIONAL PURPOSES ONLY)
+
+======================================================================
+
+一、版权声明
+本仓库（AuroraMusic 游戏音乐混音播放器）的源代码和相关资源，仅
+可用于个人学习、技术研究与交流。
+
+本项目源码由作者（及其贡献者）编写。同时，本项目集成并依赖以下
+第三方软件/二进制资源，其版权归各自版权所有者所有：
+
+  - BASS Audio Library (un4seen developments) — 商业用途需购买授权
+    https://www.un4seen.com/bass.html
+  - BASSmix 扩展库 (un4seen developments) — 商业用途需购买授权
+  - RNNoise (Xiph.Org / Mozilla) — BSD 许可
+  - VB-CABLE Virtual Audio Device (VB-Audio) — 需遵守其许可协议
+    商业/专业环境需捐赠并获得 License
+  - Electron、Vue、Pinia、koffi 等 — 各自开源许可
+  - music-metadata — MIT 许可
+
+二、禁止商用 ⛔
+本项目（包括源码、文档、打包产物等全部内容） 不支持商业用途。
+
+  ❌ 不得将本项目用于任何形式的商业活动，包括但不限于：
+     - 直接或间接出售、租赁、授权、分销
+     - 将其嵌入任何收费或营利性产品/服务
+     - 以商业目的提供 SAAS、代理或托管服务
+     - 用于任何可能产生直接或间接经济收益的场景
+
+  ⚠️  若您使用 BASS、VB-CABLE 等第三方组件进行商业活动，
+      请单独向其版权所有者申请商用许可。本作者对此不承担
+      任何责任。
+
+三、后果自负（免责声明）
+1. 本项目以"原样（AS IS）"形式提供，作者 不对其适用性、稳
+   定性、可靠性、安全性做任何明示或暗示担保。
+2. 因使用本项目造成的任何直接或间接损失、纠纷、法律后果，
+   作者 概不负责。
+3. 用户自行判断本项目是否适合其使用场景，全部风险由用户自
+   行承担。包括但不限于：
+     - 音频驱动冲突导致系统崩溃、蓝屏
+     - 虚拟音频设备配置错误导致游戏封禁
+     - 第三方平台的语音行为违规、封禁处罚
+     - 版权内容（音乐、影视作品）的播放与传播争议
+     - 软件 Bug 导致的数据或设备损坏
+
+四、授权范围（学习版）
+在满足上述全部约束的前提下，您可以：
+  ✅ 下载、阅读源码
+  ✅ 编译、运行、个人使用
+  ✅ 修改后用于个人学习研究
+  ✅ 非商业性二次分发（需保留本 LICENSE 和免责声明）
+
+五、其他
+- 如果本项目侵犯了您的合法权益，请联系作者，将在第一时间修
+  复或删除相关内容。
+- 任何衍生项目都必须包含与本文件一致的版权声明、禁止商用声
+  明以及免责条款。
+
+======================================================================
+
+ENGLISH TRANSLATION (for reference):
+
+1. FOR EDUCATIONAL / PERSONAL USE ONLY. NO COMMERCIAL USE IS ALLOWED.
+2. THIS SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND.
+3. USE AT YOUR OWN RISK. THE AUTHORS ACCEPT NO LIABILITY FOR ANY
+   DAMAGE ARISING FROM THE USE OF THIS SOFTWARE.
+4. BASS, VB-CABLE, AND OTHER INCLUDED THIRD-PARTY COMPONENTS ARE
+   SUBJECT TO THEIR OWN LICENSES. PLEASE OBTAIN THE NECESSARY
+   PERMISSIONS FOR ANY USE, ESPECIALLY COMMERCIAL USE.

@@ -1,0 +1,46 @@
+// ---- 主题：暖橙（默认） ----
+:root, [data-theme='warm-orange'] {
+  --c-accent-1: #ff7e5f;
+  --c-accent-2: #feb47b;
+  --c-accent-text: #ffe8dc;
+}
+[data-theme='violet'] {
+  --c-accent-1: #667eea;
+  --c-accent-2: #764ba2;
+  --c-accent-text: #e9e4ff;
+}
+[data-theme='neon-pink'] {
+  --c-accent-1: #f093fb;
+  --c-accent-2: #f5576c;
+  --c-accent-text: #ffe6f4;
+}
+[data-theme='glacier'] {
+  --c-accent-1: #4facfe;
+  --c-accent-2: #00f2fe;
+  --c-accent-text: #e1f6ff;
+}
+[data-theme='mint'] {
+  --c-accent-1: #43e97b;
+  --c-accent-2: #38f9d7;
+  --c-accent-text: #e4fff3;
+}
+
+// ---- 通用 ----
+:root {
+  --bg-app: #0a0a0f;
+  --text-1: #fff;
+  --text-2: rgba(255,255,255,.78);
+  --text-3: rgba(255,255,255,.55);
+  --text-4: rgba(255,255,255,.38);
+  --glass-bg:    rgba(255,255,255,.05);
+  --glass-bg-2:  rgba(255,255,255,.07);
+  --glass-line:  rgba(255,255,255,.09);
+  --glass-line-2:rgba(255,255,255,.06);
+  --radius-lg: 22px;
+  --radius-md: 14px;
+  --radius-sm: 10px;
+  --radius-xs: 8px;
+  --space-1: 4px; --space-2: 8px; --space-3: 12px; --space-4: 16px; --space-5: 20px; --space-6: 24px;
+  --fs-h1: 21px; --fs-h2: 18px; --fs-h3: 15px; --fs-body: 13px; --fs-small: 12px; --fs-xs: 11px;
+  --shadow-glow: 0 6px 24px rgba(255,126,95,.28);
+}
