@@ -107,12 +107,106 @@ AuroraMusic 是一款 **Electron + Vue 3** 开发的 **本地音乐播放器 + �
 
 | 文件 | 说明 | 适用场景 |
 |------|------|---------|
-| `Aurora Music Setup 0.3.0.exe` | **NSIS 安装版**（双击安装到桌面/开始菜单） | 想长期使用、想要图标的用户 |
-| `Aurora Music 0.3.0.exe` | **Portable 免安装版**（双击直接运行） | 拷给朋友、U 盘随身用 |
+| `Aurora Music Setup 0.4.0.exe` | **NSIS 安装版**（双击安装到桌面/开始菜单） | 想长期使用、想要图标的用户 |
+| `Aurora Music 0.4.0.exe` | **Portable 免安装版**（双击直接运行） | 拷给朋友、U 盘随身用 |
 
 > 💡 **一键启动**：下载后**双击 exe** 即可打开，无需安装 Node.js、无需 npm install！
 >
 > 安装完成后，桌面和开始菜单会自动创建 `Aurora Music` 快捷方式，双击即可启动。
+
+---
+
+### 📦 安装包已包含的组件
+
+| 组件 | 是否包含 | 说明 |
+|------|:--------:|------|
+| 应用程序代码 | ✅ | `out/` 编译产物（主进程 + 渲染进程 + preload） |
+| bass.dll | ✅ | BASS 音频引擎 — 播放/混音核心 |
+| bassmix.dll | ✅ | BASSmix 混音插件 — 音乐 + 麦克风混合 |
+| rnnoise.dll | ✅ | RNNoise AI 降噪引擎 |
+| VB-CABLE 虚拟声卡驱动 | ❌ | 系统级驱动，需管理员权限 + 重启，有授权限制 |
+
+> **VB-CABLE 是游戏混音功能的关键依赖** — 它创建虚拟音频设备，将混音后的音频路由给游戏队友。因版权和系统限制无法打包进 EXE，但 AuroraMusic 内置了自动安装器，首次开启混音时会引导用户一键下载安装。
+
+---
+
+### 🔧 VB-CABLE 安装流程教学图
+
+```mermaid
+flowchart TD
+    A["🖥️ 下载并安装 AuroraMusic EXE"] --> B["🎵 打开 AuroraMusic"]
+    B --> C["🎮 点击「混音开关」"]
+    C --> D{"应用内检测\nVB-CABLE 是否已安装?"}
+
+    D -- "已安装 ✅" --> I["🎚️ 混音功能直接可用\n音乐+麦克风 → 队友听到"]
+    D -- "未安装 ❌" --> E["📋 弹出安装向导"]
+
+    E --> F["⬇️ 自动下载 VB-CABLE 驱动包\n（从 vb-audio.com 官方下载）"]
+    F --> G["🔐 UAC 弹窗 → 点击「是」\n授权管理员权限"]
+    G --> H["🔄 安装完成 → 重启电脑"]
+    H --> I
+
+    style A fill:#4CAF50,color:#fff
+    style I fill:#2196F3,color:#fff
+    style D fill:#FF9800,color:#fff
+    style E fill:#FF9800,color:#fff
+    style H fill:#9C27B0,color:#fff
+```
+
+<details>
+<summary>📖 VB-CABLE 详细安装步骤（展开查看）</summary>
+
+#### 第 1 步：在 AuroraMusic 内触发安装
+
+打开 AuroraMusic → 点击底部 **混音开关** → 应用自动检测到缺少 VB-CABLE → 弹出安装向导
+
+安装向导会自动完成：
+1. 从 `https://download.vb-audio.com/Download_CABLE/VBCABLE_Driver_Pack43.zip` 下载驱动包
+2. 解压到临时目录
+3. 调起 `VBCABLE_Setup_x64.exe`（弹出 UAC 授权窗口）
+
+#### 第 2 步：UAC 授权
+
+系统弹出 **用户账户控制** 窗口 → 点击 **「是」** 授权管理员权限
+
+#### 第 3 步：VB-CABLE 安装
+
+VB-CABLE 安装程序启动后：
+1. 点击 **Install** 按钮
+2. 等待 1-2 分钟安装完成
+
+#### 第 4 步：重启电脑（必须）
+
+安装完成后**必须重启系统**，虚拟麦克风才会生效
+
+#### 第 5 步：验证安装
+
+打开 **设置 → 系统 → 声音**，确认能看到：
+- **播放设备**：`CABLE Input (VB-Audio Virtual Cable)`
+- **录音设备**：`CABLE Output (VB-Audio Virtual Cable)`
+
+#### 第 6 步：设置游戏麦克风
+
+在游戏设置中将 **麦克风（输入）** 设为 `CABLE Output (VB-Audio Virtual Cable)`
+
+</details>
+
+<details>
+<summary>📥 手动下载 VB-CABLE（如自动安装失败）</summary>
+
+如果自动安装失败（网络问题/UAC 被拦截），可手动操作：
+
+1. 前往官网：https://vb-audio.com/Cable/
+2. 下载 `VBCABLE_Driver_Pack43.zip`
+3. 解压后以管理员身份运行 `VBCABLE_Setup_x64.exe`
+4. 安装完成后重启电脑
+5. 在系统声音设置中确认设备已出现
+
+> VB-CABLE 是 Donationware（捐赠软件），个人非商业使用免费。
+
+</details>
+
+---
 
 ### 🛠️ 方式二：从源码运行（开发者）
 
@@ -147,8 +241,8 @@ npm run dev
 npm run build      # 编译主进程 + 渲染进程
 npm run dist       # 打包 NSIS 安装包 + portable 单文件
 # 打包产物在 release/ 目录下：
-#   release\Aurora Music Setup 0.3.0.exe   ← 安装版
-#   release\Aurora Music 0.3.0.exe         ← 免安装版
+#   release\Aurora Music Setup 0.4.0.exe   ← 安装版
+#   release\Aurora Music 0.4.0.exe         ← 免安装版
 ```
 
 ---
